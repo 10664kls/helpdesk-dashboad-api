@@ -210,7 +210,7 @@ func genTicketsToExcel(fx *excelize.File, wg *sync.WaitGroup, sheetName string, 
 	for i, s := range tickets {
 		var closedDate string
 		if s.ClosedDate.Format("2006-01-02") != "1900-01-01" {
-			closedDate = s.ClosedDate.Format("02/01/2006 15:04:05")
+			closedDate = s.ClosedDate.Format("02/01/2006")
 		}
 		fx.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow+i), s.Number)
 		fx.SetCellValue(sheetName, fmt.Sprintf("B%d", startRow+i), s.Category)
