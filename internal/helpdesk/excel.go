@@ -114,7 +114,7 @@ func (s *Service) GenExcel(ctx context.Context, in *BatchGetTicketsQuery) (*byte
 	fx.SetCellValue(sheetSummary, fmt.Sprintf("E%d", startCategoryReportRow), "Grand Total")
 	fx.SetRowStyle(sheetSummary, startCategoryReportRow, startCategoryReportRow, styleHeader)
 	wg.Add(1)
-	go genCategoryReportToExcel(fx, &wg, sheetSummary, startCategoryReportRow, categoryReports)
+	go genCategoryReportToExcel(fx, &wg, sheetSummary, startCategoryReportRow, styleHeader, categoryReports)
 
 	startSupporterReportRow := 10 + startCategoryReportRow + len(categoryReports)
 	fx.SetCellValue(sheetSummary, fmt.Sprintf("A%d", startSupporterReportRow), "IT Technical Summary Report Full Name")
@@ -124,7 +124,7 @@ func (s *Service) GenExcel(ctx context.Context, in *BatchGetTicketsQuery) (*byte
 	fx.SetCellValue(sheetSummary, fmt.Sprintf("E%d", startSupporterReportRow), "Grand Total")
 	fx.SetRowStyle(sheetSummary, startSupporterReportRow, startSupporterReportRow, styleHeader)
 	wg.Add(1)
-	go genSupporterReportToExcel(fx, &wg, sheetSummary, startSupporterReportRow, supporterReports)
+	go genSupporterReportToExcel(fx, &wg, sheetSummary, startSupporterReportRow, styleHeader, supporterReports)
 
 	startPriorityReportRow := 10 + startSupporterReportRow + len(supporterReports)
 	fx.SetCellValue(sheetSummary, fmt.Sprintf("A%d", startPriorityReportRow), "Priority Summary Report Type")
@@ -135,7 +135,7 @@ func (s *Service) GenExcel(ctx context.Context, in *BatchGetTicketsQuery) (*byte
 	fx.SetCellValue(sheetSummary, fmt.Sprintf("F%d", startPriorityReportRow), "Grand Total")
 	fx.SetRowStyle(sheetSummary, startPriorityReportRow, startPriorityReportRow, styleHeader)
 	wg.Add(1)
-	go genPriorityReportToExcel(fx, &wg, sheetSummary, startPriorityReportRow, priorityReports)
+	go genPriorityReportToExcel(fx, &wg, sheetSummary, startPriorityReportRow, styleHeader, priorityReports)
 
 	startTicketsRow := 2
 	var nextID string
@@ -171,30 +171,75 @@ func (s *Service) GenExcel(ctx context.Context, in *BatchGetTicketsQuery) (*byte
 	return buf, nil
 }
 
-func genSupporterReportToExcel(fx *excelize.File, wg *sync.WaitGroup, sheetName string, startRow int, supporters []*SupporterReport) {
+func genSupporterReportToExcel(fx *excelize.File, wg *sync.WaitGroup, sheetName string, startRow, style int, supporters []*SupporterReport) {
 	defer wg.Done()
+	sum := make(map[string]int64, 0)
+	sum["inProgress"] = 0
+	sum["resolved"] = 0
+	sum["blank"] = 0
+	sum["total"] = 0
+
 	for i, r := range supporters {
 		fx.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow+i+1), r.Name)
 		fx.SetCellValue(sheetName, fmt.Sprintf("B%d", startRow+i+1), r.InProgress)
 		fx.SetCellValue(sheetName, fmt.Sprintf("C%d", startRow+i+1), r.Resolved)
 		fx.SetCellValue(sheetName, fmt.Sprintf("D%d", startRow+i+1), r.Blank)
 		fx.SetCellValue(sheetName, fmt.Sprintf("E%d", startRow+i+1), r.Total)
+
+		sum["inProgress"] += r.InProgress
+		sum["resolved"] += r.Resolved
+		sum["blank"] += r.Blank
+		sum["total"] += r.Total
 	}
+
+	fx.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow+len(supporters)+1), "Grand Total")
+	fx.SetCellValue(sheetName, fmt.Sprintf("B%d", startRow+len(supporters)+1), sum["inProgress"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("C%d", startRow+len(supporters)+1), sum["resolved"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("D%d", startRow+len(supporters)+1), sum["blank"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("E%d", startRow+len(supporters)+1), sum["total"])
+
+	fx.SetRowStyle(sheetName, startRow+len(supporters)+1, startRow+len(supporters)+1, style)
 }
 
-func genCategoryReportToExcel(fx *excelize.File, wg *sync.WaitGroup, sheetName string, startRow int, categories []*CategoryReport) {
+func genCategoryReportToExcel(fx *excelize.File, wg *sync.WaitGroup, sheetName string, startRow, style int, categories []*CategoryReport) {
 	defer wg.Done()
+
+	sum := make(map[string]int64, 0)
+	sum["inProgress"] = 0
+	sum["resolved"] = 0
+	sum["blank"] = 0
+	sum["total"] = 0
 	for i, r := range categories {
 		fx.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow+i+1), r.Name)
 		fx.SetCellValue(sheetName, fmt.Sprintf("B%d", startRow+i+1), r.InProgress)
 		fx.SetCellValue(sheetName, fmt.Sprintf("C%d", startRow+i+1), r.Resolved)
 		fx.SetCellValue(sheetName, fmt.Sprintf("D%d", startRow+i+1), r.Blank)
 		fx.SetCellValue(sheetName, fmt.Sprintf("E%d", startRow+i+1), r.Total)
+
+		sum["inProgress"] += r.InProgress
+		sum["resolved"] += r.Resolved
+		sum["blank"] += r.Blank
+		sum["total"] += r.Total
 	}
+
+	fx.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow+len(categories)+1), "Grand Total")
+	fx.SetCellValue(sheetName, fmt.Sprintf("B%d", startRow+len(categories)+1), sum["inProgress"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("C%d", startRow+len(categories)+1), sum["resolved"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("D%d", startRow+len(categories)+1), sum["blank"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("E%d", startRow+len(categories)+1), sum["total"])
+
+	fx.SetRowStyle(sheetName, startRow+len(categories)+1, startRow+len(categories)+1, style)
 }
 
-func genPriorityReportToExcel(fx *excelize.File, wg *sync.WaitGroup, sheetName string, startRow int, priorities []*PriorityReport) {
+func genPriorityReportToExcel(fx *excelize.File, wg *sync.WaitGroup, sheetName string, startRow, style int, priorities []*PriorityReport) {
 	defer wg.Done()
+
+	sum := make(map[string]int64, 0)
+	sum["high"] = 0
+	sum["medium"] = 0
+	sum["low"] = 0
+	sum["blank"] = 0
+	sum["total"] = 0
 	for i, r := range priorities {
 		fx.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow+i+1), r.Name)
 		fx.SetCellValue(sheetName, fmt.Sprintf("B%d", startRow+i+1), r.High)
@@ -202,7 +247,22 @@ func genPriorityReportToExcel(fx *excelize.File, wg *sync.WaitGroup, sheetName s
 		fx.SetCellValue(sheetName, fmt.Sprintf("D%d", startRow+i+1), r.Low)
 		fx.SetCellValue(sheetName, fmt.Sprintf("E%d", startRow+i+1), r.Blank)
 		fx.SetCellValue(sheetName, fmt.Sprintf("F%d", startRow+i+1), r.Total)
+
+		sum["high"] += r.High
+		sum["medium"] += r.Medium
+		sum["low"] += r.Low
+		sum["blank"] += r.Blank
+		sum["total"] += r.Total
 	}
+
+	fx.SetCellValue(sheetName, fmt.Sprintf("A%d", startRow+len(priorities)+1), "Grand Total")
+	fx.SetCellValue(sheetName, fmt.Sprintf("B%d", startRow+len(priorities)+1), sum["high"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("C%d", startRow+len(priorities)+1), sum["medium"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("D%d", startRow+len(priorities)+1), sum["low"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("E%d", startRow+len(priorities)+1), sum["blank"])
+	fx.SetCellValue(sheetName, fmt.Sprintf("F%d", startRow+len(priorities)+1), sum["total"])
+
+	fx.SetRowStyle(sheetName, startRow+len(priorities)+1, startRow+len(priorities)+1, style)
 }
 
 func genTicketsToExcel(fx *excelize.File, wg *sync.WaitGroup, sheetName string, startRow int, tickets []*Ticket) {
