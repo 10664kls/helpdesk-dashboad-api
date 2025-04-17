@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/10664kls/helpdesk-dashboad-api/internal/pager"
@@ -13,6 +14,7 @@ import (
 type Service struct {
 	db   *sql.DB
 	zlog *zap.Logger
+	mu   *sync.Mutex
 }
 
 func NewService(_ context.Context, db *sql.DB, zlog *zap.Logger) (*Service, error) {
@@ -27,44 +29,45 @@ func NewService(_ context.Context, db *sql.DB, zlog *zap.Logger) (*Service, erro
 	return &Service{
 		db:   db,
 		zlog: zlog,
+		mu:   new(sync.Mutex),
 	}, nil
 }
 
-type ListHelpDesksResult struct {
-	HelpDesks     []*HelpDesk `json:"helpDesks"`
-	NextPageToken string      `json:"nextToken"`
+type ListTicketsResult struct {
+	Tickets       []*Ticket `json:"tickets"`
+	NextPageToken string    `json:"nextPageToken"`
 }
 
-func (s *Service) ListHelpDesks(ctx context.Context, in *HelpDeskQuery) (*ListHelpDesksResult, error) {
+func (s *Service) ListTickets(ctx context.Context, in *TicketQuery) (*ListTicketsResult, error) {
 	zlog := s.zlog.With(
-		zap.String("method", "ListHelpDesks"),
+		zap.String("method", "ListTickets"),
 		zap.Any("query", in),
 	)
 
-	zlog.Info("starting to list help desks")
+	zlog.Info("starting to list tickets")
 
-	helpDesks, err := listHelpDesks(ctx, s.db, in)
+	tickets, err := listTickets(ctx, s.db, in)
 	if err != nil {
-		zlog.Error("failed to list help desks", zap.Error(err))
+		zlog.Error("failed to list tickets", zap.Error(err))
 		return nil, err
 	}
 
 	var pageToken string
-	if l := len(helpDesks); l > 0 && l == int(pager.Size(in.PageSize)) {
-		last := helpDesks[l-1]
+	if l := len(tickets); l > 0 && l == int(pager.Size(in.PageSize)) {
+		last := tickets[l-1]
 		pageToken = pager.EncodeCursor(&pager.Cursor{
 			ID:   last.ID,
 			Time: last.CreatedAt,
 		})
 	}
 
-	return &ListHelpDesksResult{
-		HelpDesks:     helpDesks,
+	return &ListTicketsResult{
+		Tickets:       tickets,
 		NextPageToken: pageToken,
 	}, nil
 }
 
-type HelpDesk struct {
+type Ticket struct {
 	ID          string    `json:"id"`
 	Number      string    `json:"number"`
 	Category    string    `json:"category"`
@@ -72,13 +75,13 @@ type HelpDesk struct {
 	Status      string    `json:"status"`
 	Title       string    `json:"title"`
 	Description string    `json:"description"`
-	Requester   Staff     `json:"requester"`
+	Employee    Employee  `json:"employee"`
 	Supporter   Supporter `json:"supporter"`
 	CreatedAt   time.Time `json:"createdAt"`
-	ClosedDate  string    `json:"closedDate"`
+	ClosedDate  time.Time `json:"closedDate"`
 }
 
-type Staff struct {
+type Employee struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"displayName"`
 	Position    string `json:"position"`

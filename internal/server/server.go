@@ -35,7 +35,9 @@ func (s *Server) Install(e *echo.Echo, mdw ...echo.MiddlewareFunc) error {
 
 	v1 := e.Group("/v1")
 
-	v1.GET("/helpdesks", s.listStatements, mdw...)
+	hd := v1.Group("/helpdesk")
+	hd.GET("/tickets", s.listTickets, mdw...)
+	hd.GET("/tickets/export-to-excel", s.exportToExcel, mdw...)
 
 	return nil
 }
@@ -51,17 +53,35 @@ func badJSON() error {
 	return s.Err()
 }
 
-func (s *Server) listStatements(c echo.Context) error {
-	req := new(helpdesk.HelpDeskQuery)
+func (s *Server) listTickets(c echo.Context) error {
+	req := new(helpdesk.TicketQuery)
 	if err := c.Bind(req); err != nil {
 		return badJSON()
 	}
 
 	ctx := c.Request().Context()
-	helpDesks, err := s.hdSvc.ListHelpDesks(ctx, req)
+	tickets, err := s.hdSvc.ListTickets(ctx, req)
 	if err != nil {
 		return err
 	}
 
-	return c.JSON(http.StatusOK, helpDesks)
+	return c.JSON(http.StatusOK, tickets)
+}
+
+func (s *Server) exportToExcel(c echo.Context) error {
+	req := new(helpdesk.BatchGetTicketsQuery)
+	if err := c.Bind(req); err != nil {
+		return badJSON()
+	}
+
+	ctx := c.Request().Context()
+	buf, err := s.hdSvc.GenExcel(ctx, req)
+	if err != nil {
+		return err
+	}
+
+	c.Response().Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Response().Header().Set("Content-Disposition", "attachment; filename=\"help-desk-tickets.xlsx\"")
+
+	return c.Blob(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
 }
